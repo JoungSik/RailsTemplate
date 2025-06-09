@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# 테스트 실패를 강제로 발생시켜 스크린샷 생성을 테스트하는 스크립트
+
+set -e
+
+echo "🧪 테스트 실패 시나리오 생성 중..."
+
+# 임시로 실패하는 시스템 테스트 생성
+mkdir -p test/system
+
+cat > test/system/screenshot_test.rb << 'EOF'
+require "application_system_test_case"
+
+class ScreenshotTest < ApplicationSystemTestCase
+  test "visiting the index page should fail for screenshot demo" do
+    visit "/"
+    
+    # 스크린샷 생성을 위해 의도적으로 실패
+    assert_text "This text does not exist"
+    
+    # 추가 페이지 방문으로 더 많은 스크린샷 생성
+    visit "/nonexistent_page"
+    assert_text "404"
+  end
+  
+  test "another failing test for more screenshots" do
+    visit "/"
+    
+    # 다른 실패 시나리오
+    assert_selector "h1", text: "Nonexistent Title"
+  end
+end
+EOF
+
+echo "✅ 실패하는 시스템 테스트가 생성되었습니다: test/system/screenshot_test.rb"
+echo ""
+echo "🚀 이제 다음 명령어로 스크린샷을 생성할 수 있습니다:"
+echo "  bin/run-ci-tests"
+echo ""
+echo "⚠️  테스트가 의도적으로 실패하므로 스크린샷이 tmp/screenshots/ 에 생성됩니다."
+echo ""
+echo "🧹 테스트 정리:"
+echo "  rm test/system/screenshot_test.rb"

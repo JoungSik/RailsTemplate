@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# CI 환경 설정 스크립트
+# pre-commit과 act를 설치하고 구성합니다.
+
+set -e
+
+echo "🔧 CI 환경 설정을 시작합니다..."
+
+# pre-commit 설치 확인
+if ! command -v pre-commit &> /dev/null; then
+    echo "📦 pre-commit 설치 중..."
+    if command -v brew &> /dev/null; then
+        brew install pre-commit
+    elif command -v pip &> /dev/null; then
+        pip install pre-commit
+    elif command -v pip3 &> /dev/null; then
+        pip3 install pre-commit
+    else
+        echo "❌ pre-commit 설치 실패: brew, pip, pip3 중 하나가 필요합니다."
+        exit 1
+    fi
+else
+    echo "✅ pre-commit이 이미 설치되어 있습니다."
+fi
+
+# act 설치 확인
+if ! command -v act &> /dev/null; then
+    echo "📦 act 설치 중..."
+    if command -v brew &> /dev/null; then
+        brew install act
+    else
+        echo "❌ act 설치 실패: brew가 필요합니다."
+        echo "   수동 설치: https://github.com/nektos/act#installation"
+        exit 1
+    fi
+else
+    echo "✅ act가 이미 설치되어 있습니다."
+fi
+
+# Docker 실행 확인
+if ! docker info &> /dev/null; then
+    echo "❌ Docker가 실행되지 않습니다. Docker Desktop을 시작해주세요."
+    exit 1
+else
+    echo "✅ Docker가 실행 중입니다."
+fi
+
+# pre-commit 훅 설치
+echo "🔗 pre-commit 훅 설치 중..."
+pre-commit install
+pre-commit install --hook-type pre-push
+
+# 스크린샷 디렉토리 생성
+mkdir -p tmp/screenshots
+
+echo ""
+echo "🎉 CI 환경 설정이 완료되었습니다!"
+echo ""
+echo "📋 사용법:"
+echo "  - 수동 CI 실행: bin/run-ci-tests"
+echo "  - Git push 시 자동 실행됩니다"
+echo "  - 결과는 tmp/screenshots/ 에 저장됩니다"
+echo ""
+echo "🧪 테스트 실행:"
+echo "  bin/run-ci-tests"

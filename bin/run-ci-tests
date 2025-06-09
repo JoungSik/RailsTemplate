@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Rails CI Test Runner with Screenshots
+# 이 스크립트는 pre-commit 훅에서 실행되어 CI 테스트를 로컬에서 실행하고 스크린샷을 생성합니다.
+
+set -e
+
+echo "🚀 Starting CI Tests with Act..."
+
+# 스크린샷 디렉토리 생성
+mkdir -p tmp/screenshots
+
+# 현재 시간 기록
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+LOG_FILE="tmp/screenshots/ci_run_${TIMESTAMP}.log"
+SUMMARY_FILE="tmp/screenshots/ci_summary_${TIMESTAMP}.md"
+
+echo "📝 로그 파일: $LOG_FILE"
+echo "📄 요약 파일: $SUMMARY_FILE"
+
+# CI 요약 파일 헤더 작성
+cat > "$SUMMARY_FILE" << EOF
+# CI Test Results - $TIMESTAMP
+
+**실행 시간**: $(date)
+**브랜치**: $(git branch --show-current)
+**커밋**: $(git rev-parse --short HEAD)
+
+## 테스트 결과
+
+EOF
+
+# Act 실행 및 결과 캡처
+echo "🧪 Running all CI jobs..."
+
+# 모든 job 개별 실행하여 결과 수집
+JOBS=("scan_ruby" "scan_js" "lint" "test")
+RESULTS=()
+
+for job in "${JOBS[@]}"; do
+    echo "🔍 Running job: $job"
+    JOB_LOG="tmp/screenshots/${job}_${TIMESTAMP}.log"
+    
+    if act -j "$job" 2>&1 | tee "$JOB_LOG"; then
+        echo "✅ $job: PASSED" >> "$SUMMARY_FILE"
+        RESULTS+=("✅ $job")
+    else
+        echo "❌ $job: FAILED" >> "$SUMMARY_FILE"
+        RESULTS+=("❌ $job")
+        
+        # 실패한 경우 에러 요약 추가
+        echo -e "\n### $job 실패 상세:" >> "$SUMMARY_FILE"
+        echo '```' >> "$SUMMARY_FILE"
+        tail -20 "$JOB_LOG" >> "$SUMMARY_FILE"
+        echo '```' >> "$SUMMARY_FILE"
+    fi
+done
+
+# 전체 결과 요약
+echo -e "\n## 전체 요약\n" >> "$SUMMARY_FILE"
+for result in "${RESULTS[@]}"; do
+    echo "- $result" >> "$SUMMARY_FILE"
+done
+
+# 스크린샷 정보 추가 (시스템 테스트 실패 시 생성됨)
+if [ -d "tmp/screenshots" ] && [ "$(ls -A tmp/screenshots/*.png 2>/dev/null)" ]; then
+    echo -e "\n## 스크린샷\n" >> "$SUMMARY_FILE"
+    for screenshot in tmp/screenshots/*.png; do
+        if [ -f "$screenshot" ]; then
+            echo "- $(basename "$screenshot")" >> "$SUMMARY_FILE"
+        fi
+    done
+fi
+
+# 전체 로그 통합
+echo "📚 통합 로그 생성 중..."
+cat tmp/screenshots/*_${TIMESTAMP}.log > "$LOG_FILE" 2>/dev/null || true
+
+# 결과 출력
+echo ""
+echo "🎯 CI 테스트 완료!"
+echo "📊 결과 요약:"
+for result in "${RESULTS[@]}"; do
+    echo "  $result"
+done
+
+echo ""
+echo "📁 생성된 파일:"
+echo "  - 요약: $SUMMARY_FILE"
+echo "  - 전체 로그: $LOG_FILE"
+
+# 시스템 테스트 스크린샷 확인
+if [ "$(ls -A tmp/screenshots/*.png 2>/dev/null)" ]; then
+    echo "  - 스크린샷: tmp/screenshots/*.png"
+fi
+
+# pre-commit에서 실행 시 실패한 job이 있으면 exit 1
+FAILED_COUNT=$(echo "${RESULTS[@]}" | grep -o "❌" | wc -l || true)
+if [ "$FAILED_COUNT" -gt 0 ]; then
+    echo ""
+    echo "⚠️  $FAILED_COUNT 개의 job이 실패했습니다."
+    echo "📋 자세한 내용은 $SUMMARY_FILE 을 확인하세요."
+    exit 1
+fi
+
+echo ""
+echo "🎉 모든 CI 테스트가 성공했습니다!"
